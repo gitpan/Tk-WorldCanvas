@@ -5,7 +5,7 @@ use strict;
 use Tk;
 
 use vars qw($VERSION);
-$VERSION = '1.2.1';
+$VERSION = '1.2.2';
 
 #Version
 #1.0.0 -- Sept 20, 2001 -- Initial release.
@@ -14,6 +14,7 @@ $VERSION = '1.2.1';
 #                          better error handleing in 'bbox',
 #                          cleaned up syntax
 #1.2.1 -- May  17, 2002 -- changed package name to Tk::WorldCanvas
+#1.2.2 -- June 28, 2002 -- Fixed bug in 'coords'
 
 @Tk::WorldCanvas::ISA = qw(Tk::Derived Tk::Canvas);
 
@@ -449,7 +450,7 @@ sub coords {
         my ($x1, $y1, $x2, $y2) = _find_box($canvas->SUPER::coords($tag));
 
         my @c_coords = @w_coords;
-        for (my $i = 2; $i < @c_coords; $i += 2) {
+        for (my $i = 0; $i < @c_coords; $i += 2) {
             $c_coords[$i]     =  $c_coords[$i    ] * $scale + $movex;
             $c_coords[$i + 1] = -$c_coords[$i + 1] * $scale + $movey;
         }
@@ -1151,7 +1152,13 @@ problems.  You can change it back with:
     $worldcanvas->configure(-confine => 1);
 
 
-(2) The bounding box of all objects is required to set the scroll region.
+(2) '-scrollregion' is maintained by I<WorldCanvas> to include all
+objects on the canvas.  '-scrollregion' will be adjusted automatically
+as objects are added, deleted, scaled, moved, etc.  (You can create a
+static scrollregion by adding a border rectangle to the canvas.)
+
+
+(3) The bounding box of all objects is required to set the scroll region.
 Calculating this bounding box is expensive if the canvas has a large
 number of objects.  So for performance reasons these operations will
 not immediately change the bounding box if they potentially shrink it:
@@ -1168,6 +1175,20 @@ is that the scrollbars will be incorrect until the update.
 If these operations increase the size of the box, changing the box is
 trivial and the update is immediate.
 
+=head1 INSTALLATION
+
+    Standard method:
+
+    perl Makefile.PL
+    make
+    make test
+    make install
+
+    The last step requires proper permissions.
+
+    Or you can copy the WorldCanvas.pm file to a local directory and
+    skip the formalities.
+
 =head1 AUTHOR
 
 Joseph Skrovan (I<joseph@skrovan.com>)
@@ -1178,10 +1199,8 @@ If you use and enjoy I<WorldCanvas> please let me know.
 
 =head1 COPYRIGHTS
 
-This module is distributed under the same terms as Perl itself.
-
-This module may be distributed under the terms of the
-GNU General Public License (GPL) or under the terms of
-the Artistic License.
+    Copyright (c) 2002 Joseph Skrovan. All rights reserved.
+    This program is free software; you can redistribute it and/or modify it
+    under the same terms as Perl itself. 
 
 =cut

@@ -12,6 +12,7 @@ MANIFEST
 Makefile.PL
 $pm.pm
 test.pl
+README
 EOM
 ;
 close MF or die $!;

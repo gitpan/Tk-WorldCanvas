@@ -2,3 +2,4 @@ MANIFEST
 Makefile.PL
 WorldCanvas.pm
 test.pl
+README
