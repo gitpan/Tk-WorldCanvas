@@ -31,6 +31,7 @@ WriteMakefile(
                      },
     ABSTRACT      => "Tk::WorldCanvas - Autoscaling Canvas widget with zoom, viewAll, viewArea, viewFit, and center",
     AUTHOR        => 'Joseph Skrovan (junk@skrovan.com)',
+    PREREQ_PM     => {'Tk' => '800.013'}
 );
 
 __DATA__
@@ -107,10 +108,10 @@ if (Tk::Exists($w)) {
             my @c = $w->coords($id5);
             ok(@c, 4, "Error: wrong number of args returned from 'coords'");
             my $correct = 0;
-            if (abs($c[0] - 13) < 0.001 and
-                abs($c[1] -  3) < 0.001 and
-                abs($c[2] - 15) < 0.001 and
-                abs($c[3] -  5) < 0.001) {
+            if (abs($c[0] - 13) < 0.01 and
+                abs($c[1] -  3) < 0.01 and
+                abs($c[2] - 15) < 0.01 and
+                abs($c[3] -  5) < 0.01) {
                 $correct = 1;
             }
             ok($correct, 1, "Error: object not in correct place");
@@ -119,7 +120,7 @@ if (Tk::Exists($w)) {
             my $x = $w->worldx($w->width / 2);
             my $y = $w->worldy($w->height / 2);
             my $correct = 0;
-            $correct = 1 if abs($x - 2.0) < 0.001 and abs($y - 4.0) < 0.001;
+            $correct = 1 if abs($x - 2.0) < 0.01 and abs($y - 4.0) < 0.01;
             ok($correct, 1, "Error: center is not at the correct location");
         }
         for (my $i = 0; $i < 8; $i++) {

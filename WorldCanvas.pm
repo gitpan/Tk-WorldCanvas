@@ -5,7 +5,7 @@ use strict;
 use Tk;
 
 use vars qw($VERSION);
-$VERSION = '1.2.6';
+$VERSION = '1.2.7';
 
 #Version
 #1.0.0 -- Sept 20, 2001 -- Initial release.
@@ -19,6 +19,7 @@ $VERSION = '1.2.6';
 #1.2.4 -- Sept  5, 2002 -- Added to POD
 #1.2.5 -- Sept  6, 2002 -- Enhanced view window scaleing on canvas resize
 #1.2.6 -- Nov   1, 2002 -- Fixed _view_area_canvas bug.
+#1.2.7 -- Nov  19, 2002 -- handle fractional arguments to canvas(x|y)
 
 @Tk::WorldCanvas::ISA = qw(Tk::Derived Tk::Canvas);
 
@@ -206,8 +207,8 @@ sub _scale {
 
     $scale = abs($scale);
 
-    my $x = $canvas->canvasx($xo);
-    my $y = $canvas->canvasy($yo);
+    my $x = $canvas->canvasx(0) + $xo;
+    my $y = $canvas->canvasy(0) + $yo;
 
     if (!$canvas->type('all')) {return;} # can't find it
 
@@ -767,7 +768,7 @@ sub worldx {
     my $pData = $canvas->privateData;
     my $scale = $pData->{'scale'};
     return if !$scale;
-    return (($canvas->canvasx($x) - $pData->{'movex'}) / $scale);
+    return (($canvas->canvasx(0) + $x - $pData->{'movex'}) / $scale);
 }
 
 sub worldy {
@@ -776,7 +777,7 @@ sub worldy {
     my $pData = $canvas->privateData;
     my $scale = $pData->{'scale'};
     return if !$scale;
-    return (0 - ($canvas->canvasy($y) - $pData->{'movey'}) / $scale);
+    return (0 - ($canvas->canvasy(0) + $y - $pData->{'movey'}) / $scale);
 }
 
 sub worldxy {
@@ -785,8 +786,8 @@ sub worldxy {
     my $pData = $canvas->privateData;
     my $scale = $pData->{'scale'};
     return if !$scale;
-    return (    ($canvas->canvasx($x) - $pData->{'movex'}) / $scale,
-            0 - ($canvas->canvasy($y) - $pData->{'movey'}) / $scale);
+    return (    ($canvas->canvasx(0) + $x - $pData->{'movex'}) / $scale,
+            0 - ($canvas->canvasy(0) + $y - $pData->{'movey'}) / $scale);
 }
 
 sub widgetx {
@@ -927,7 +928,12 @@ user's coordinate system to the now mostly hidden coordinate system of
 the Canvas widget.  In world coordinates the y-axis increases in
 the upward direction.
 
-I<WorldCanvas> is meant to be a drop in replacement for Canvas.
+I<WorldCanvas> is meant to be a replacement for Canvas.  It's not
+quite a "drop in" replacement though because the y-axis is inverted
+compared to Canvas.  Usually to convert you will have to invert all
+y-coordinates used to create objects.  Typically, you should call
+$worldcanvas->viewAll (or $worldcanvas->viewArea(@box)) before calling
+MainLoop.
 
 Most of the I<WorldCanvas> methods are the same as the I<Canvas>
 methods except that they accept and return world coordinates instead
