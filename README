@@ -69,8 +69,7 @@ NEW METHODS
         canvas contains a large number of objects.
 
     *$worldcanvas*->eventLocation()
-        This function returns the world coordinates (x, y) of the
-        last Xevent.
+        Returns the world coordinates (x, y) of the last Xevent.
 
     *$worldcanvas*->panWorld(*dx, dy*)
         Pans the display by the specified world distances. panWorld
@@ -100,16 +99,15 @@ NEW METHODS
         display magnification.
 
     *$worldcanvas*->pixelSize()
-        This function returns the width (in world coordinates) of a
-        pixel (at the current magnification).
+        Returns the width (in world coordinates) of a pixel (at the
+        current magnification).
 
     *$worldcanvas*->rubberBand(*{0|1|2}*)
-        This method creates a rubber banding box that allows the
-        user to graphically select a region. rubberBand is called
-        with a step parameter '0', '1', or '2'. '0' to start a new
-        box, '1' to stretch the box, and '2' to finish the box. When
-        called with '2', the specified box is returned (x1, y1, x2,
-        y2)
+        Creates a rubber banding box that allows the user to
+        graphically select a region. rubberBand is called with a
+        step parameter '0', '1', or '2'. '0' to start a new box, '1'
+        to stretch the box, and '2' to finish the box. When called
+        with '2', the specified box is returned (x1, y1, x2, y2)
 
         The band color is set with the *WorldCanvas* option '-
         bandColor'. The default color is 'red'
@@ -161,19 +159,21 @@ NEW METHODS
         calling viewAll or viewArea, and then entering MainLoop. A
         $MainWindow->update is needed before the viewAll.
 
-        Example: <Add objects to canvas> $mw->update; # Instantiates
-        the canvas (and determines its width and height)
-        $worldcanvas->viewAll; MainLoop;
+            Example:
+
+            <Add objects to canvas>
+            $mw->update;         # Instantiates the canvas (and determines its width and height)
+            $worldcanvas->viewAll;
+            MainLoop;
 
     *$worldcanvas*->viewArea(x1, y1, x2, y2, [-border => number]))
         Displays at maximum possible zoom the specified region
         centered in the *WorldCanvas*.
 
     *$worldcanvas*->viewFit([-border => number], *TagOrID*, [*TagOrID*, ...])
-        This method adjusts the worldcanvas to display all of the
-        specified tags. The '-border' switch specifies (as a
-        percentage) how much extra surrounding space should be
-        shown.
+        Adjusts the worldcanvas to display all of the specified
+        tags. The '-border' switch specifies (as a percentage) how
+        much extra surrounding space should be shown.
 
     *$worldcanvas*->getView()
         Returns the rectangle of the current view (x1, y1, x2, y2)

@@ -5,7 +5,7 @@ use strict;
 use Tk;
 
 use vars qw($VERSION);
-$VERSION = '1.2.4';
+$VERSION = '1.2.5';
 
 #Version
 #1.0.0 -- Sept 20, 2001 -- Initial release.
@@ -17,6 +17,7 @@ $VERSION = '1.2.4';
 #1.2.2 -- June 28, 2002 -- Fixed bug in 'coords'
 #1.2.3 -- July 31, 2002 -- Fixed another bug in 'coords', and an agrument passing bug.
 #1.2.4 -- Sept  5, 2002 -- Added to POD
+#1.2.5 -- Sept  6, 2002 -- Enhanced view window scaleing on canvas resize
 
 @Tk::WorldCanvas::ISA = qw(Tk::Derived Tk::Canvas);
 
@@ -58,6 +59,15 @@ sub InitObject {
                 _view_area_canvas($worldcanvas, $b, $b, $ow - $b, $oh - $b);
                 $pData->{'width'} = $w;
                 $pData->{'height'} = $h;
+
+                my $bbox = $pData->{'bbox'};
+                my $le = $worldcanvas->canvasx($b);
+                my $re = $worldcanvas->canvasx($w - $b);
+                my $te = $worldcanvas->canvasy($b);
+                my $be = $worldcanvas->canvasy($h - $b);
+                if (_inside(@$bbox, $le, $te, $re, $be)) {
+                    $worldcanvas->viewAll;
+                }
             }
         }
     );
@@ -981,9 +991,11 @@ magnification of the display.
 an accurate bounding box.  This will be expensive if the canvas
 contains a large number of objects.
 
+
 =item I<$worldcanvas>->B<eventLocation>()
 
-This function returns the world coordinates (x, y) of the last Xevent.
+Returns the world coordinates (x, y) of the last Xevent.
+
 
 =item I<$worldcanvas>->B<panWorld>(I<dx, dy>)
 
@@ -1015,16 +1027,16 @@ is shifted will be dependent on the current display magnification.
 
 =item I<$worldcanvas>->B<pixelSize>()
 
-This function returns the width (in world coordinates) of a
-pixel (at the current magnification).
+Returns the width (in world coordinates) of a pixel (at the current magnification).
+
 
 =item I<$worldcanvas>->B<rubberBand>(I<{0|1|2}>)
 
-This method creates a rubber banding box that allows the user
-to graphically select a region.  B<rubberBand> is called
-with a step parameter '0', '1', or '2'.  '0' to start a new box,
-'1' to stretch the box, and '2' to finish the box.  When
-called with '2', the specified box is returned (x1, y1, x2, y2)
+Creates a rubber banding box that allows the user to graphically
+select a region.  B<rubberBand> is called with a step parameter
+'0', '1', or '2'.  '0' to start a new box, '1' to stretch the box,
+and '2' to finish the box.  When called with '2', the specified
+box is returned (x1, y1, x2, y2)
 
 The band color is set with the I<WorldCanvas> option '-bandColor'.
 The default color is 'red'
@@ -1074,7 +1086,8 @@ It is common for an application to start by adding objects, calling B<viewAll> o
 B<viewArea>, and then entering MainLoop.  A $MainWindow->update is needed before
 the B<viewAll>. 
 
-Example:
+    Example:
+
     <Add objects to canvas>
     $mw->update;         # Instantiates the canvas (and determines its width and height)
     $worldcanvas->viewAll;
@@ -1086,15 +1099,17 @@ Example:
 Displays at maximum possible zoom the specified region centered
 in the I<WorldCanvas>.
 
+
 =item I<$worldcanvas>->B<viewFit>([-border => number], I<TagOrID>, [I<TagOrID>, ...])
 
-This method adjusts the worldcanvas to display all of
-the specified tags.  The '-border' switch specifies (as a percentage)
-how much extra surrounding space should be shown.
+Adjusts the worldcanvas to display all of the specified tags.  The '-border'
+switch specifies (as a percentage) how much extra surrounding space should be shown.
+
 
 =item I<$worldcanvas>->B<getView>()
 
 Returns the rectangle of the current view (x1, y1, x2, y2)
+
 
 =item I<$worldcanvas>->B<widgetx>(I<x>)
 
@@ -1103,6 +1118,7 @@ Returns the rectangle of the current view (x1, y1, x2, y2)
 =item I<$worldcanvas>->B<widgetxy>(I<x, y>)
 
 Convert world coordinates to widget coordinates.
+
 
 =item I<$worldcanvas>->B<worldx>(I<x>)
 
@@ -1123,6 +1139,7 @@ instead of widget coordinates unless otherwise specified.  (ie. These
 methods take and return world coordinates: center, panWorld, viewArea,
 find, coords, scale, move, bbox, rubberBand, eventLocation, pixelSize,
 and create*)
+
 
 =item I<$worldcanvas>->B<bbox>([-exact => {0 | 1}], I<TagOrID>, [I<TagOrID>, ...])
 
