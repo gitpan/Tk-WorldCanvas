@@ -5,7 +5,7 @@ use strict;
 use Tk;
 
 use vars qw($VERSION);
-$VERSION = '1.2.2';
+$VERSION = '1.2.3';
 
 #Version
 #1.0.0 -- Sept 20, 2001 -- Initial release.
@@ -15,6 +15,7 @@ $VERSION = '1.2.2';
 #                          cleaned up syntax
 #1.2.1 -- May  17, 2002 -- changed package name to Tk::WorldCanvas
 #1.2.2 -- June 28, 2002 -- Fixed bug in 'coords'
+#1.2.3 -- July 31, 2002 -- Fixed another bug in 'coords', and an agrument passing bug.
 
 @Tk::WorldCanvas::ISA = qw(Tk::Derived Tk::Canvas);
 
@@ -374,7 +375,7 @@ sub _map_coords {
 
     my $x = 1;
     while (defined (my $arg = shift)) {
-        if ($arg =~ /^-\D/) {
+        if ($arg !~ /^[+-.]*\d/) {
             unshift @_, $arg;
             last;
         } else {
@@ -462,11 +463,19 @@ sub coords {
         @w_coords = $canvas->SUPER::coords($tag);
         die "missing y coordinate in return value from SUPER::coords\n" if @w_coords % 2;
         for (my $i = 0; $i < @w_coords; $i += 2) {
-            $w_coords[$i] =      ($w_coords[$i]     - $movex) / $scale;
-            $w_coords[$i + 1] = -($w_coords[$i + 1] - $movey) / $scale;
+            $w_coords[$i] =         ($w_coords[$i]     - $movex) / $scale;
+            $w_coords[$i + 1] = 0 - ($w_coords[$i + 1] - $movey) / $scale;
         }
-        return (@w_coords) if @w_coords;
+        if (@w_coords == 4 and ($w_coords[0] > $w_coords[2] or $w_coords[1] > $w_coords[3])) {
+            my $type = $canvas->type($tag);
+            if ($type =~ /^arc$|^oval$|^rectangle$/) {
+                ($w_coords[0], $w_coords[2]) = ($w_coords[2], $w_coords[0]) if $w_coords[0] > $w_coords[2];
+                ($w_coords[1], $w_coords[3]) = ($w_coords[3], $w_coords[1]) if $w_coords[1] > $w_coords[3];
+            }
+        }
+        return @w_coords;
     }
+    return;
 }
 
 sub scale {
@@ -752,7 +761,7 @@ sub worldy {
     my $pData = $canvas->privateData;
     my $scale = $pData->{'scale'};
     return if !$scale;
-    return (-($canvas->canvasy($y) - $pData->{'movey'}) / $scale);
+    return (0 - ($canvas->canvasy($y) - $pData->{'movey'}) / $scale);
 }
 
 sub worldxy {
@@ -761,8 +770,8 @@ sub worldxy {
     my $pData = $canvas->privateData;
     my $scale = $pData->{'scale'};
     return if !$scale;
-    return ( ($canvas->canvasx($x) - $pData->{'movex'}) / $scale,
-            -($canvas->canvasy($y) - $pData->{'movey'}) / $scale);
+    return (    ($canvas->canvasx($x) - $pData->{'movex'}) / $scale,
+            0 - ($canvas->canvasy($y) - $pData->{'movey'}) / $scale);
 }
 
 sub widgetx {
@@ -807,7 +816,7 @@ sub createPolygon {
     $coords_mapped = 1;
     my $id = $canvas->SUPER::createPolygon(@new_args);
     $coords_mapped = 0;
-    return ($id);
+    return $id;
 }
 
 sub createRectangle {
@@ -816,7 +825,7 @@ sub createRectangle {
     $coords_mapped = 1;
     my $id = $canvas->SUPER::createRectangle(@new_args);
     $coords_mapped = 0;
-    return ($id);
+    return $id;
 }
 
 sub createArc {
@@ -825,7 +834,7 @@ sub createArc {
     $coords_mapped = 1;
     my $id = $canvas->SUPER::createArc(@new_args);
     $coords_mapped = 0;
-    return ($id);
+    return $id;
 }
 
 sub createLine {
@@ -834,7 +843,7 @@ sub createLine {
     $coords_mapped = 1;
     my $id = $canvas->SUPER::createLine(@new_args);
     $coords_mapped = 0;
-    return ($id);
+    return $id;
 }
 
 sub createOval {
@@ -843,7 +852,7 @@ sub createOval {
     $coords_mapped = 1;
     my $id = $canvas->SUPER::createOval(@new_args);
     $coords_mapped = 0;
-    return ($id);
+    return $id;
 }
 
 sub createText {
@@ -852,7 +861,7 @@ sub createText {
     $coords_mapped = 1;
     my $id = $canvas->SUPER::createText(@new_args);
     $coords_mapped = 0;
-    return ($id);
+    return $id;
 }
 
 sub createWindow {
@@ -861,7 +870,7 @@ sub createWindow {
     $coords_mapped = 1;
     my $id = $canvas->SUPER::createWindow(@new_args);
     $coords_mapped = 0;
-    return ($id);
+    return $id;
 }
 
 sub createBitmap {
@@ -870,7 +879,7 @@ sub createBitmap {
     $coords_mapped = 1;
     my $id = $canvas->SUPER::createBitmap(@new_args);
     $coords_mapped = 0;
-    return ($id);
+    return $id;
 }
 
 sub createImage {
@@ -879,7 +888,7 @@ sub createImage {
     $coords_mapped = 1;
     my $id = $canvas->SUPER::createImage(@new_args);
     $coords_mapped = 0;
-    return ($id);
+    return $id;
 }
 
 1;
@@ -908,6 +917,20 @@ I<WorldCanvas> is meant to be a drop in replacement for Canvas.
 Most of the I<WorldCanvas> methods are the same as the I<Canvas>
 methods except that they accept and return world coordinates instead
 of widget coordinates.
+
+=head1 INSTALLATION
+
+    Standard method:
+
+    perl Makefile.PL
+    make
+    make test
+    make install
+
+    The last step requires proper permissions.
+
+    Or you can copy the WorldCanvas.pm file to a local directory and
+    skip the formalities.
 
 =head1 NEW METHODS
 
@@ -1174,20 +1197,6 @@ is that the scrollbars will be incorrect until the update.
 
 If these operations increase the size of the box, changing the box is
 trivial and the update is immediate.
-
-=head1 INSTALLATION
-
-    Standard method:
-
-    perl Makefile.PL
-    make
-    make test
-    make install
-
-    The last step requires proper permissions.
-
-    Or you can copy the WorldCanvas.pm file to a local directory and
-    skip the formalities.
 
 =head1 AUTHOR
 
