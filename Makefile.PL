@@ -28,7 +28,7 @@ WriteMakefile(
                         COMPRESS => 'gzip',
                         SUFFIX   => 'gz',
                      },
-    ABSTRACT      => "WorldCanvas - Perl/Tk Canvas widget which uses the user's coordinate system",
+    ABSTRACT      => "Tk::WorldCanvas - Autoscaling Canvas widget with zoom, viewAll, viewArea, viewFit, and center",
     AUTHOR        => 'Joseph Skrovan (junk@skrovan.com)',
 );
 

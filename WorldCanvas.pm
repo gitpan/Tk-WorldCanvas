@@ -1,11 +1,11 @@
-package WorldCanvas;
+package Tk::WorldCanvas;
 require Tk::Canvas;
 require Tk::Derived;
 use strict;
 use Tk;
 
 use vars qw($VERSION);
-$VERSION = '1.2.0';
+$VERSION = '1.2.1';
 
 #Version
 #1.0.0 -- Sept 20, 2001 -- Initial release.
@@ -13,8 +13,9 @@ $VERSION = '1.2.0';
 #1.2.0 -- Jan  29, 2002 -- Added 'getView' method,
 #                          better error handleing in 'bbox',
 #                          cleaned up syntax
+#1.2.1 -- May  17, 2002 -- changed package name to Tk::WorldCanvas
 
-@WorldCanvas::ISA = qw(Tk::Derived Tk::Canvas);
+@Tk::WorldCanvas::ISA = qw(Tk::Derived Tk::Canvas);
 
 Construct Tk::Widget 'WorldCanvas';
 
@@ -886,7 +887,7 @@ __END__
 
 =head1 NAME
 
-I<WorldCanvas> - Autoscaling Canvas widget with zoom, viewAll, viewArea, viewFit, and center.
+Tk::WorldCanvas - Autoscaling Canvas widget with zoom, viewAll, viewArea, viewFit, and center.
 
 =for category Tk Widget Classes
 
