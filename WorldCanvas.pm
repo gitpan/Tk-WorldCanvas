@@ -5,7 +5,7 @@ use strict;
 use Tk;
 
 use vars qw($VERSION);
-$VERSION = '1.2.3';
+$VERSION = '1.2.4';
 
 #Version
 #1.0.0 -- Sept 20, 2001 -- Initial release.
@@ -16,6 +16,7 @@ $VERSION = '1.2.3';
 #1.2.1 -- May  17, 2002 -- changed package name to Tk::WorldCanvas
 #1.2.2 -- June 28, 2002 -- Fixed bug in 'coords'
 #1.2.3 -- July 31, 2002 -- Fixed another bug in 'coords', and an agrument passing bug.
+#1.2.4 -- Sept  5, 2002 -- Added to POD
 
 @Tk::WorldCanvas::ISA = qw(Tk::Derived Tk::Canvas);
 
@@ -714,7 +715,8 @@ sub eventLocation {
     my ($canvas) = @_;
 
     my $ev = $canvas->XEvent;
-    return ($canvas->worldx($ev->x), $canvas->worldy($ev->y));
+    return ($canvas->worldx($ev->x), $canvas->worldy($ev->y)) if defined $ev;
+    return;
 }
 
 sub viewFit {
@@ -946,9 +948,9 @@ Zooms the display by the specified amount.  Example:
     # If you are using the 'Scrolled' constructor as in:
     my $worldcanvas = $main->Scrolled('WorldCanvas', -scrollbars => 'nw', ... )
     # you want to bind the key-presses to the 'worldcanvas' Subwidget of Scrolled.
-    my $subw = $worldcanvas->Subwidget('worldcanvas'); # note the lower case 'worldcanvas'
-    $subw->CanvasBind('<i>' => sub {$subw->zoom(1.25)});
-    $subw->CanvasBind('<o>' => sub {$subw->zoom(0.8)});
+    my $scrolled_canvas = $worldcanvas->Subwidget('worldcanvas'); # note the lower case 'worldcanvas'
+    $scrolled_canvas->CanvasBind('<i>' => sub {$scrolled_canvas->zoom(1.25)});
+    $scrolled_canvas->CanvasBind('<o>' => sub {$scrolled_canvas->zoom(0.8)});
 
     # I don't like the scrollbars taking the focus when I
     # <ctrl>-tab through the windows, so I:
@@ -1061,6 +1063,23 @@ Displays at maximum possible zoom all objects centered in the
 I<WorldCanvas>.  The switch '-border' specifies, as a percentage
 of the screen, the minimum amount of white space to be left on
 the edges of the display.  Default '-border' is 0.02.
+
+All I<WorldCanvas> view methods use the current canvas height and width to
+determine the scale and position of the view area.  The canvas size will
+be '1 by 1' until it is instantiated by the MainLoop call or the first 
+$MainWindow->update().  So the view methods will produce undesirable results
+if they are called before the canvas has been instantiated (and given a size).
+
+It is common for an application to start by adding objects, calling B<viewAll> or
+B<viewArea>, and then entering MainLoop.  A $MainWindow->update is needed before
+the B<viewAll>. 
+
+Example:
+    <Add objects to canvas>
+    $mw->update;         # Instantiates the canvas (and determines its width and height)
+    $worldcanvas->viewAll;
+    MainLoop;
+
 
 =item I<$worldcanvas>->B<viewArea>(x1, y1, x2, y2, [-border => number]))
 
