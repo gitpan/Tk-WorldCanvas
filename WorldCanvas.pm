@@ -5,11 +5,14 @@ use strict;
 use Tk;
 
 use vars qw($VERSION);
-$VERSION = '1.1.0';
+$VERSION = '1.2.0';
 
 #Version
 #1.0.0 -- Sept 20, 2001 -- Initial release.
 #1.1.0 -- Oct  29, 2001 -- Added '-changeView' callback option
+#1.2.0 -- Jan  29, 2002 -- Added 'getView' method,
+#                          better error handleing in 'bbox',
+#                          cleaned up syntax
 
 @WorldCanvas::ISA = qw(Tk::Derived Tk::Canvas);
 
@@ -25,32 +28,32 @@ sub InitObject {
     my ($worldcanvas, $args) = @_;
 
     my $pData = $worldcanvas->privateData;
-    $pData->{bbox} = [0, 0, -1, -1];
-    $pData->{scale} = 1;
-    $pData->{movex} = 0;
-    $pData->{movey} = 0;
-    $pData->{bboxvalid} = 1;
-    $pData->{width} = $worldcanvas->width;
-    $pData->{height} = $worldcanvas->height;
+    $pData->{'bbox'} = [0, 0, -1, -1];
+    $pData->{'scale'} = 1;
+    $pData->{'movex'} = 0;
+    $pData->{'movey'} = 0;
+    $pData->{'bboxvalid'} = 1;
+    $pData->{'width'} = $worldcanvas->width;
+    $pData->{'height'} = $worldcanvas->height;
 
     $worldcanvas->configure(-confine => 0);
 
-    $worldcanvas->ConfigSpecs('-bandColor' => ["PASSIVE", "bandColor", "BandColor", "red"],
+    $worldcanvas->ConfigSpecs('-bandColor' => ['PASSIVE', 'bandColor', 'BandColor', 'red'],
                               '-bandcolor' => '-bandColor',
-                              '-changeView' => ["CALLBACK", "changeView", "ChangeView", undef],
+                              '-changeView' => ['CALLBACK', 'changeView', 'ChangeView', undef],
                               '-changeview'  => '-changeView');
 
     $worldcanvas->CanvasBind('<Configure>' =>
         sub {
-            my $w = $worldcanvas->width();
-            my $h = $worldcanvas->height();
-            my $ow = $pData->{width};
-            my $oh = $pData->{height};
+            my $w = $worldcanvas->width;
+            my $h = $worldcanvas->height;
+            my $ow = $pData->{'width'};
+            my $oh = $pData->{'height'};
             if ($w != $ow or $h != $oh) {
-                my $b = $worldcanvas->cget("-borderwidth");
+                my $b = $worldcanvas->cget('-borderwidth');
                 _view_area_canvas($worldcanvas, $b, $b, $ow - $b, $oh - $b);
-                $pData->{width} = $w;
-                $pData->{height} = $h;
+                $pData->{'width'} = $w;
+                $pData->{'height'} = $h;
             }
         }
     );
@@ -58,29 +61,28 @@ sub InitObject {
     $worldcanvas->SUPER::InitObject($args);
 }
 
-sub _changeView {
+sub getView {
     my ($canvas) = @_;
 
-    my $borderwidth = $canvas->cget("-borderwidth");
-    my $right_edge = $canvas->width() - $borderwidth;
-    my $top_edge = $canvas->height() - $borderwidth;
+    my $borderwidth = $canvas->cget('-borderwidth');
+    my $right_edge = $canvas->width - $borderwidth;
+    my $top_edge = $canvas->height - $borderwidth;
 
-    $canvas->Callback(-changeView, worldxy($canvas, $borderwidth, $borderwidth),
-                                   worldxy($canvas, $right_edge, $top_edge));
+    return (worldxy($canvas, $borderwidth, $borderwidth), worldxy($canvas, $right_edge, $top_edge));
 }
 
 sub xview {
     my $canvas = shift;
-    _new_bbox($canvas) if !$canvas->privateData->{bboxvalid};
+    _new_bbox($canvas) unless $canvas->privateData->{'bboxvalid'};
     $canvas->SUPER::xview(@_);
-    _changeView($canvas) if defined($canvas->cget('-changeView'));
+    $canvas->Callback(-changeView, getView($canvas)) if defined($canvas->cget('-changeView'));
 }
 
 sub yview {
     my $canvas = shift;
-    _new_bbox($canvas) if !$canvas->privateData->{bboxvalid};
+    _new_bbox($canvas) unless $canvas->privateData->{'bboxvalid'};
     $canvas->SUPER::yview(@_);
-    _changeView($canvas) if defined($canvas->cget('-changeView'));
+    $canvas->Callback(-changeView, getView($canvas)) if defined($canvas->cget('-changeView'));
 }
 
 sub delete {
@@ -95,23 +97,23 @@ sub delete {
             last;
         }
     }
-    if (!$found) {
+    if (!$found) { # can't find anything!
         _makeBand($canvas) if $recreate;
         return;
-    } # can't find anything!
+    }
 
     my $pData = $canvas->privateData;
-    my ($cx1, $cy1, $cx2, $cy2) = @{$pData->{bbox}};
+    my ($cx1, $cy1, $cx2, $cy2) = @{$pData->{'bbox'}};
     my ($x1, $y1, $x2, $y2) = _superBbox($canvas, @tags);
     $canvas->SUPER::delete(@tags);
 
     if (!$canvas->type('all')) {  # deleted last object
-        $pData->{bbox} = [0, 0, -1, -1];
-        $pData->{scale} = 1;
-        $pData->{movex} = 0;
-        $pData->{movey} = 0;
+        $pData->{'bbox'} = [0, 0, -1, -1];
+        $pData->{'scale'} = 1;
+        $pData->{'movex'} = 0;
+        $pData->{'movey'} = 0;
     } elsif (!_inside($x1, $y1, $x2, $y2, $cx1, $cy1, $cx2, $cy2)) {
-        $pData->{bboxvalid} = 0;
+        $pData->{'bboxvalid'} = 0;
     }
     _makeBand($canvas) if $recreate;
 }
@@ -132,36 +134,32 @@ sub _inside {
 sub _new_bbox {
     my ($canvas) = @_;
 
-    my $borderwidth = $canvas->cget("-borderwidth");
-    my $vwidth = $canvas->width() - 2 * $borderwidth;
-    my $vheight = $canvas->height() - 2 * $borderwidth;
+    my $borderwidth = $canvas->cget('-borderwidth');
+    my $vwidth = $canvas->width - 2 * $borderwidth;
+    my $vheight = $canvas->height - 2 * $borderwidth;
 
     my $pData = $canvas->privateData;
-    my ($cx1, $cy1, $cx2, $cy2) = @{$pData->{bbox}};
+    my ($cx1, $cy1, $cx2, $cy2) = @{$pData->{'bbox'}};
 
     $cx2 += 1 if $cx2 == $cx1;
     $cy2 += 1 if $cy2 == $cy1;
-    my $zoomx = $vwidth  / (abs ($cx2 - $cx1));
-    my $zoomy = $vheight / (abs ($cy2 - $cy1));
+    my $zoomx = $vwidth  / abs($cx2 - $cx1);
+    my $zoomy = $vheight / abs($cy2 - $cy1);
     my $zoom = ($zoomx > $zoomy) ? $zoomx : $zoomy;
 
     if ($zoom > 1.01) {
-        _scale($canvas, $canvas->width() / 2, $canvas->height() / 2, $zoom * 100);
+        _scale($canvas, $canvas->width / 2, $canvas->height / 2, $zoom * 100);
     }
 
-    my $scale = $pData->{scale};
-    my $movex = $pData->{movex};
-    my $movey = $pData->{movey};
-
     my ($x1, $y1, $x2, $y2) = _superBbox($canvas, 'all');
-    $pData->{bbox} =                    [$x1, $y1, $x2, $y2];
+    $pData->{'bbox'} =                  [$x1, $y1, $x2, $y2];
     $canvas->configure(-scrollregion => [$x1, $y1, $x2, $y2]);
 
     if ($zoom > 1.01) {
-        _scale($canvas, $canvas->width() / 2, $canvas->height() / 2, 1 / ($zoom * 100));
+        _scale($canvas, $canvas->width / 2, $canvas->height / 2, 1 / ($zoom * 100));
     }
 
-    $pData->{bboxvalid} = 1;
+    $pData->{'bboxvalid'} = 1;
 }
 
 sub _find_box {
@@ -181,14 +179,13 @@ sub _find_box {
 
 sub zoom {
     my ($canvas, $zoom) = @_;
-    _new_bbox($canvas) if !$canvas->privateData->{bboxvalid};
-    _scale($canvas, $canvas->width() / 2, $canvas->height() / 2, $zoom);
-    _changeView($canvas) if defined($canvas->cget('-changeView'));
+    _new_bbox($canvas) unless $canvas->privateData->{'bboxvalid'};
+    _scale($canvas, $canvas->width / 2, $canvas->height / 2, $zoom);
+    $canvas->Callback(-changeView, getView($canvas)) if defined($canvas->cget('-changeView'));
 }
 
 sub _scale {
-    my $canvas = shift;
-    my ($xo, $yo, $scale) = @_;
+    my ($canvas, $xo, $yo, $scale) = @_;
 
     $scale = abs($scale);
 
@@ -198,64 +195,62 @@ sub _scale {
     if (!$canvas->type('all')) {return;} # can't find it
 
     my $pData = $canvas->privateData;
-    $pData->{movex} = ($pData->{movex} - $x) * $scale + $x;
-    $pData->{movey} = ($pData->{movey} - $y) * $scale + $y;
-    $pData->{scale} *= $scale;
+    $pData->{'movex'} = ($pData->{'movex'} - $x) * $scale + $x;
+    $pData->{'movey'} = ($pData->{'movey'} - $y) * $scale + $y;
+    $pData->{'scale'} *= $scale;
 
     $canvas->SUPER::scale('all', $x, $y, $scale, $scale);
 
-    my ($x1, $y1, $x2, $y2) = @{$pData->{bbox}};
+    my ($x1, $y1, $x2, $y2) = @{$pData->{'bbox'}};
     $x1 = ($x1 - $x) * $scale + $x;
     $x2 = ($x2 - $x) * $scale + $x;
     $y1 = ($y1 - $y) * $scale + $y;
     $y2 = ($y2 - $y) * $scale + $y;
-    $pData->{bbox} =                    [$x1, $y1, $x2, $y2];
+    $pData->{'bbox'} =                  [$x1, $y1, $x2, $y2];
     $canvas->configure(-scrollregion => [$x1, $y1, $x2, $y2]);
 }
 
 sub center {
-    my $canvas = shift;
-    my $x = shift;
-    my $y = shift;
+    my ($canvas, $x, $y) = @_;
 
     if (!$canvas->type('all')) {return;} # can't find anything!
 
     my $pData = $canvas->privateData;
-    _new_bbox($canvas) if !$pData->{bboxvalid};
+    _new_bbox($canvas) unless $pData->{'bboxvalid'};
 
-    $x = $x *  $pData->{scale} + $pData->{movex};
-    $y = $y * -$pData->{scale} + $pData->{movey};
+    $x = $x *  $pData->{'scale'} + $pData->{'movex'};
+    $y = $y * -$pData->{'scale'} + $pData->{'movey'};
 
-    my $dx = $canvas->canvasx($canvas->width() / 2) - $x;
-    my $dy = $canvas->canvasy($canvas->height() / 2) - $y;
+    my $dx = $canvas->canvasx($canvas->width / 2) - $x;
+    my $dy = $canvas->canvasy($canvas->height / 2) - $y;
 
-    $pData->{movex} += $dx;
-    $pData->{movey} += $dy;
+    $pData->{'movex'} += $dx;
+    $pData->{'movey'} += $dy;
     $canvas->SUPER::move('all', $dx, $dy);
 
-    my ($x1, $y1, $x2, $y2) = @{$pData->{bbox}};
+    my ($x1, $y1, $x2, $y2) = @{$pData->{'bbox'}};
     $x1 += $dx;
     $x2 += $dx;
     $y1 += $dy;
     $y2 += $dy;
-    $pData->{bbox} =                    [$x1, $y1, $x2, $y2];
+    $pData->{'bbox'} =                  [$x1, $y1, $x2, $y2];
     $canvas->configure(-scrollregion => [$x1, $y1, $x2, $y2]);
-    _changeView($canvas) if defined($canvas->cget('-changeView'));
+    $canvas->Callback(-changeView, getView($canvas)) if defined($canvas->cget('-changeView'));
 }
 
 sub centerTags {
     my ($canvas, @args) = @_;
 
     my ($x1, $y1, $x2, $y2) = bbox($canvas, @args);
-    return if !defined($y2);
+    return unless defined($y2);
     center($canvas, ($x1 + $x2) / 2.0, ($y1 + $y2) / 2.0);
 }
 
 sub panWorld {
     my ($canvas, $x, $y) = @_;
 
-    my $cx = worldx($canvas, $canvas->width() / 2)  + $x;
-    my $cy = worldy($canvas, $canvas->height() / 2) + $y;
+    my $cx = worldx($canvas, $canvas->width / 2)  + $x;
+    my $cy = worldy($canvas, $canvas->height / 2) + $y;
     center($canvas, $cx, $cy);
 }
 
@@ -268,12 +263,12 @@ sub viewAll {
     $switches{-border} = 0 if $switches{-border} < 0;
 
     my $pData = $canvas->privateData;
-    _new_bbox($canvas) if !$pData->{bboxvalid};
+    _new_bbox($canvas) unless $pData->{'bboxvalid'};
 
-    my ($x1, $y1, $x2, $y2) = @{$pData->{bbox}};
-    my $scale = $pData->{scale};
-    my $movex = $pData->{movex};
-    my $movey = $pData->{movey};
+    my ($x1, $y1, $x2, $y2) = @{$pData->{'bbox'}};
+    my $scale = $pData->{'scale'};
+    my $movex = $pData->{'movex'};
+    my $movey = $pData->{'movey'};
     my $wx1 = ($x1 - $movex) / $scale;
     my $wx2 = ($x2 - $movex) / $scale;
     my $wy1 = ($y1 - $movey) / $scale;
@@ -283,11 +278,7 @@ sub viewAll {
 }
 
 sub viewArea {
-    my $canvas = shift;
-    my $vx1 = shift;
-    my $vy1 = shift;
-    my $vx2 = shift;
-    my $vy2 = shift;
+    my ($canvas, $vx1, $vy1, $vx2, $vy2) = splice(@_, 0, 5);
 
     if (!defined($vy2) or !$canvas->type('all')) {return;} # can't find anything!
 
@@ -295,7 +286,7 @@ sub viewArea {
     $switches{-border} = 0 if $switches{-border} < 0;
 
     my $pData = $canvas->privateData;
-    _new_bbox($canvas) if !$pData->{bboxvalid};
+    _new_bbox($canvas) unless $pData->{'bboxvalid'};
 
     $vy1 = -$vy1;
     $vy2 = -$vy2;
@@ -309,9 +300,9 @@ sub viewArea {
     $vy1 -= $bh;
     $vy2 += $bh;
 
-    my $scale  = $pData->{scale};
-    my $movex  = $pData->{movex};
-    my $movey  = $pData->{movey};
+    my $scale  = $pData->{'scale'};
+    my $movex  = $pData->{'movex'};
+    my $movey  = $pData->{'movey'};
     my $canvasx = $canvas->canvasx(0);
     my $canvasy = $canvas->canvasy(0);
 
@@ -328,11 +319,11 @@ sub _view_area_canvas {
 
     if (!$canvas->type('all')) {return;} # can't find anything!
     my $pData = $canvas->privateData;
-    _new_bbox($canvas) if !$pData->{bboxvalid};
+    _new_bbox($canvas) unless $pData->{'bboxvalid'};
 
-    my $borderwidth = $canvas->cget("-borderwidth");
-    my $cwidth = $canvas->width();
-    my $cheight = $canvas->height();
+    my $borderwidth = $canvas->cget('-borderwidth');
+    my $cwidth = $canvas->width;
+    my $cheight = $canvas->height;
 
     my $dx = $cwidth / 2 - ($vx1 + $vx2) / 2;
     my $dy = $cheight / 2 - ($vy1 + $vy2) / 2;
@@ -342,8 +333,8 @@ sub _view_area_canvas {
 
     $vx2 += 1 if $vx2 == $vx1;
     $vy2 += 1 if $vy2 == $vy1;
-    my $zoomx = ($cwidth - 2 * $borderwidth) / (abs ($vx2 - $vx1));
-    my $zoomy = ($cheight - 2 * $borderwidth) / (abs ($vy2 - $vy1));
+    my $zoomx =  ($cwidth - 2 * $borderwidth) / abs($vx2 - $vx1);
+    my $zoomy = ($cheight - 2 * $borderwidth) / abs($vy2 - $vy1);
     my $zoom = ($zoomx < $zoomy) ? $zoomx : $zoomy;
     $zoom = abs($zoom); # This should never be needed.
 
@@ -353,18 +344,18 @@ sub _view_area_canvas {
         $canvas->SUPER::scale('all', $midx - $dx - $dx / ($zoom - 1), $midy - $dy - $dy / ($zoom - 1), $zoom, $zoom);
     }
 
-    $pData->{movex} = ($pData->{movex} + $dx - $midx) * $zoom + $midx;
-    $pData->{movey} = ($pData->{movey} + $dy - $midy) * $zoom + $midy;
-    $pData->{scale} *= $zoom;
+    $pData->{'movex'} = ($pData->{'movex'} + $dx - $midx) * $zoom + $midx;
+    $pData->{'movey'} = ($pData->{'movey'} + $dy - $midy) * $zoom + $midy;
+    $pData->{'scale'} *= $zoom;
 
-    my ($x1, $y1, $x2, $y2) = @{$pData->{bbox}};
+    my ($x1, $y1, $x2, $y2) = @{$pData->{'bbox'}};
     $x1 = ($x1 + $dx - $midx) * $zoom + $midx;
     $x2 = ($x2 + $dx - $midx) * $zoom + $midx;
     $y1 = ($y1 + $dy - $midy) * $zoom + $midy;
     $y2 = ($y2 + $dy - $midy) * $zoom + $midy;
-    $pData->{bbox} =                    [$x1, $y1, $x2, $y2];
+    $pData->{'bbox'} =                  [$x1, $y1, $x2, $y2];
     $canvas->configure(-scrollregion => [$x1, $y1, $x2, $y2]);
-    _changeView($canvas) if defined($canvas->cget('-changeView'));
+    $canvas->Callback(-changeView, getView($canvas)) if defined($canvas->cget('-changeView'));
 }
 
 sub _map_coords {
@@ -373,11 +364,11 @@ sub _map_coords {
     my @coords = ();
     my $pData = $canvas->privateData;
     my $change_bbox = 0;
-    my ($x1, $y1, $x2, $y2) = @{$pData->{bbox}};
+    my ($x1, $y1, $x2, $y2) = @{$pData->{'bbox'}};
 
-    my $scale = $pData->{scale};
-    my $movex = $pData->{movex};
-    my $movey = $pData->{movey};
+    my $scale = $pData->{'scale'};
+    my $movex = $pData->{'movex'};
+    my $movey = $pData->{'movey'};
 
     my $x = 1;
     while (defined (my $arg = shift)) {
@@ -402,7 +393,7 @@ sub _map_coords {
         }
     }
     if ($change_bbox) {
-        $pData->{bbox} =                    [$x1, $y1, $x2, $y2];
+        $pData->{'bbox'} =                  [$x1, $y1, $x2, $y2];
         $canvas->configure(-scrollregion => [$x1, $y1, $x2, $y2]);
     }
 
@@ -416,8 +407,9 @@ sub find {
     if ($args[0] =~ m/^(closest|above|below)$/i) {
         if ($args[0] =~ m/^closest$/i) {
             return if @args < 3;
-            $args[1] =  $args[1] * $pData->{scale} + $pData->{movex};
-            $args[2] = -$args[2] * $pData->{scale} + $pData->{movey};
+            my $scale = $pData->{'scale'};
+            $args[1] =  $args[1] * $scale + $pData->{'movex'};
+            $args[2] = -$args[2] * $scale + $pData->{'movey'};
         }
         my $recreate = _killBand($canvas);
         my $found = $canvas->SUPER::find(@args);
@@ -426,10 +418,13 @@ sub find {
     } else {
         if ($args[0] =~ m/^(enclosed|overlapping)$/i) {
             return if @args < 5;
-            $args[1] =  $args[1] * $pData->{scale} + $pData->{movex};
-            $args[2] = -$args[2] * $pData->{scale} + $pData->{movey};
-            $args[3] =  $args[3] * $pData->{scale} + $pData->{movex};
-            $args[4] = -$args[4] * $pData->{scale} + $pData->{movey};
+            my $scale = $pData->{'scale'};
+            my $movex = $pData->{'movex'};
+            my $movey = $pData->{'movey'};
+            $args[1] =  $args[1] * $scale + $movex;
+            $args[2] = -$args[2] * $scale + $movey;
+            $args[3] =  $args[3] * $scale + $movex;
+            $args[4] = -$args[4] * $scale + $movey;
         }
         my $recreate = _killBand($canvas);
         my @found = $canvas->SUPER::find(@args);
@@ -444,9 +439,9 @@ sub coords {
     if (!$canvas->type($tag)) {return;} # can't find it
 
     my $pData = $canvas->privateData;
-    my $scale = $pData->{scale};
-    my $movex = $pData->{movex};
-    my $movey = $pData->{movey};
+    my $scale = $pData->{'scale'};
+    my $movex = $pData->{'movex'};
+    my $movey = $pData->{'movey'};
 
     if (@w_coords) {
         die "missing y coordinate in call to coords\n" if @w_coords % 2;
@@ -473,25 +468,24 @@ sub coords {
 }
 
 sub scale {
-    my $canvas = shift;
-    my ($tag, $xo, $yo, $xs, $ys) = @_;
+    my ($canvas, $tag, $xo, $yo, $xs, $ys) = @_;
 
     if (!$canvas->type($tag)) {return;} # can't find it
 
     my $pData = $canvas->privateData;
 
-    my $cxo =  $xo * $pData->{scale} + $pData->{movex};
-    my $cyo = -$yo * $pData->{scale} + $pData->{movey};
+    my $cxo =  $xo * $pData->{'scale'} + $pData->{'movex'};
+    my $cyo = -$yo * $pData->{'scale'} + $pData->{'movey'};
 
     if ($tag =~ m/^all$/i) {
         $canvas->SUPER::scale($tag, $cxo, $cyo, $xs, $ys);
 
-        my ($x1, $y1, $x2, $y2) = @{$pData->{bbox}};
+        my ($x1, $y1, $x2, $y2) = @{$pData->{'bbox'}};
         $x1 = ($x1 - $cxo) * $xs + $cxo;
         $x2 = ($x2 - $cxo) * $xs + $cxo;
         $y1 = ($y1 - $cyo) * $ys + $cyo;
         $y2 = ($y2 - $cyo) * $ys + $cyo;
-        $pData->{bbox} =                    [$x1, $y1, $x2, $y2];
+        $pData->{'bbox'} =                  [$x1, $y1, $x2, $y2];
         $canvas->configure(-scrollregion => [$x1, $y1, $x2, $y2]);
     } else {
         my ($x1, $y1, $x2, $y2) = _find_box($canvas->SUPER::coords($tag));
@@ -510,8 +504,9 @@ sub move {
 
     my ($x1, $y1, $x2, $y2) = _find_box($canvas->SUPER::coords($tag));
 
-    my $dx =  $x * $canvas->privateData->{"scale"};
-    my $dy = -$y * $canvas->privateData->{"scale"};
+    my $scale = $canvas->privateData->{'scale'};
+    my $dx =  $x * $scale;
+    my $dy = -$y * $scale;
     $canvas->SUPER::move($tag, $dx, $dy);
 
     my ($nx1, $ny1, $nx2, $ny2) = ($x1 + $dx, $y1 + $dy, $x2 + $dx, $y2 + $dy);
@@ -522,7 +517,7 @@ sub _adjustBbox {
     my ($canvas, $x1, $y1, $x2, $y2, $nx1, $ny1, $nx2, $ny2) = @_;
 
     my $pData = $canvas->privateData;
-    my ($cx1, $cy1, $cx2, $cy2) = @{$pData->{bbox}};
+    my ($cx1, $cy1, $cx2, $cy2) = @{$pData->{'bbox'}};
 
     my $changeBbox = 0;
     if ($nx1 < $cx1) {$cx1 = $nx1; $changeBbox = 1;}
@@ -532,7 +527,7 @@ sub _adjustBbox {
 
     #expanding the bounding box is easy.
     if ($changeBbox) {
-        $pData->{bbox} =                    [$cx1, $cy1, $cx2, $cy2];
+        $pData->{'bbox'} =                  [$cx1, $cy1, $cx2, $cy2];
         $canvas->configure(-scrollregion => [$cx1, $cy1, $cx2, $cy2]);
     }
 
@@ -546,14 +541,14 @@ sub _adjustBbox {
         ($y1 - $hmargin < $cy1 and $y1 < $ny1) or
         ($x2 + $wmargin > $cx2 and $x2 > $nx2) or
         ($y2 + $hmargin > $cy2 and $y2 > $ny2)) {
-        $pData->{bboxvalid} = 0;
+        $pData->{'bboxvalid'} = 0;
     }
 }
 
 sub bbox {
     my $canvas = shift;
-    my $exact = 0;
 
+    my $exact = 0;
     if ($_[0] =~ m/-exact/i) {
         shift;
         $exact = shift;
@@ -571,11 +566,11 @@ sub bbox {
 
     my $pData = $canvas->privateData;
 
-    if (@tags and $tags[0] =~ m/^all$/i) {
-        my ($x1, $y1, $x2, $y2) = @{$pData->{bbox}};
-        my $scale = $pData->{"scale"};
-        my $movex = $pData->{"movex"};
-        my $movey = $pData->{"movey"};
+    if ($tags[0] =~ m/^all$/i) {
+        my ($x1, $y1, $x2, $y2) = @{$pData->{'bbox'}};
+        my $scale = $pData->{'scale'};
+        my $movex = $pData->{'movex'};
+        my $movey = $pData->{'movey'};
         my $wx1 = ($x1 - $movex) /  $scale;
         my $wx2 = ($x2 - $movex) /  $scale;
         my $wy1 = ($y1 - $movey) / -$scale;
@@ -585,30 +580,43 @@ sub bbox {
         ($wy1, $wy2) = ($wy2, $wy1) if ($wy2 < $wy1);
         return ($wx1, $wy1, $wx2, $wy2);
     } else {
-        my $onePixel = 1.0 / $pData->{"scale"};
-        if ($exact and $onePixel > 0.0001) {
-            zoom($canvas, $onePixel * 10000);
+        my $onePixel = 1.0 / $pData->{'scale'};
+        my $zoom_fix = 0;
+        if ($exact and $onePixel > 0.001) {
+            zoom($canvas, $onePixel * 1000);
+            $zoom_fix = 1;
         }
         my ($x1, $y1, $x2, $y2) = _superBbox($canvas, @tags);
-
-        # If the error looks to be greater than 15%, do exact anyway
-        my $fix = 0;
-        if (!$exact and abs($x2 - $x1) < 27 and abs($y2 - $y1) < 27) {
-            $fix = 1;
-            zoom($canvas, $onePixel * 10000);
-            ($x1, $y1, $x2, $y2) = _superBbox($canvas, @tags);
+        if (not defined $x1) {
+            # @tags exist but their bbox can not be
+            # expressed in integers (overflows).
+            zoom($canvas, 1 / ($onePixel * 1000)) if $zoom_fix;
+            return;
         }
 
-        my $scale = $pData->{"scale"};
-        my $movex = $pData->{movex};
-        my $movey = $pData->{movey};
+        # If the error looks to be greater than 15%, do exact anyway
+        if (!$exact and abs($x2 - $x1) < 27 and abs($y2 - $y1) < 27) {
+            zoom($canvas, $onePixel * 1000);
+            my ($nx1, $ny1, $nx2, $ny2) = _superBbox($canvas, @tags);
+            if (not defined $nx1) {
+                # overflows integers.  Retreat to previous box.
+                zoom($canvas, 1 / ($onePixel * 1000));
+            } else {
+                $zoom_fix = 1;
+                ($x1, $y1, $x2, $y2) = ($nx1, $ny1, $nx2, $ny2);
+            }
+        }
+
+        my $scale = $pData->{'scale'};
+        my $movex = $pData->{'movex'};
+        my $movey = $pData->{'movey'};
         $x1 = ($x1 - $movex) /  $scale;
         $x2 = ($x2 - $movex) /  $scale;
         $y1 = ($y1 - $movey) / -$scale;
         $y2 = ($y2 - $movey) / -$scale;
 
-        if (($exact and $onePixel > 0.0001) or $fix) {
-            zoom($canvas, 1 / ($onePixel * 10000));
+        if ($zoom_fix) {
+            zoom($canvas, 1 / ($onePixel * 1000));
         }
         return ($x1, $y2, $x2, $y1);
     }
@@ -619,7 +627,7 @@ sub rubberBand {
     my ($canvas, $step) = @_;
 
     my $pData = $canvas->privateData;
-    return if $step >= 1 and not defined $pData->{RubberBand};
+    return if $step >= 1 and not defined $pData->{'RubberBand'};
 
     my $ev = $canvas->XEvent;
     my $x = worldx($canvas, $ev->x);
@@ -628,19 +636,19 @@ sub rubberBand {
     if ($step == 0) {
         # create anchor for rubberband
         _killBand($canvas);
-        $pData->{RubberBand} = [$x, $y, $x, $y];
+        $pData->{'RubberBand'} = [$x, $y, $x, $y];
     } elsif ($step == 1) {
         # update end of rubber band and redraw
-        $pData->{RubberBand}[2] = $x;
-        $pData->{RubberBand}[3] = $y;
+        $pData->{'RubberBand'}[2] = $x;
+        $pData->{'RubberBand'}[3] = $y;
         _killBand($canvas);
         _makeBand($canvas);
     } elsif ($step == 2) {
         # step == 2: done
         _killBand($canvas) or return;
 
-        my ($x1, $y1, $x2, $y2) = @{$pData->{RubberBand}};
-        undef($pData->{RubberBand});
+        my ($x1, $y1, $x2, $y2) = @{$pData->{'RubberBand'}};
+        undef($pData->{'RubberBand'});
 
         ($x1, $x2) = ($x2, $x1) if ($x2 < $x1);
         ($y1, $y2) = ($y2, $y1) if ($y2 < $y1);
@@ -661,11 +669,11 @@ sub _superBbox {
 sub _killBand {
     my ($canvas) = @_;
 
-    my $id = $canvas->privateData->{RubberBandID};
+    my $id = $canvas->privateData->{'RubberBandID'};
     return 0 if !defined($id);
 
     $canvas->SUPER::delete($id);
-    undef($canvas->privateData->{RubberBandID});
+    undef($canvas->privateData->{'RubberBandID'});
 
     return 1;
 }
@@ -674,21 +682,21 @@ sub _makeBand {
     my ($canvas) = @_;
 
     my $pData = $canvas->privateData;
-    my $rb = $pData->{RubberBand};
+    my $rb = $pData->{'RubberBand'};
     die "Error: RubberBand is not defined" if !$rb;
     die "Error: RubberBand does not have 4 values." if @$rb != 4;
 
-    my $scale = $pData->{"scale"};
-    my $movex = $pData->{"movex"};
-    my $movey = $pData->{"movey"};
+    my $scale = $pData->{'scale'};
+    my $movex = $pData->{'movex'};
+    my $movey = $pData->{'movey'};
     my $crbx1 = $rb->[0] *  $scale + $movex;
     my $crbx2 = $rb->[2] *  $scale + $movex;
     my $crby1 = $rb->[1] * -$scale + $movey;
     my $crby2 = $rb->[3] * -$scale + $movey;
 
-    my $color = $canvas->cget("-bandColor");
-    my $id = $canvas->SUPER::create("rectangle", $crbx1, $crby1, $crbx2, $crby2, -outline => $color);
-    $pData->{RubberBandID} = $id;
+    my $color = $canvas->cget('-bandColor');
+    my $id = $canvas->SUPER::create('rectangle', $crbx1, $crby1, $crbx2, $crby2, -outline => $color);
+    $pData->{'RubberBandID'} = $id;
 }
 
 sub eventLocation {
@@ -724,61 +732,61 @@ sub viewFit {
 sub pixelSize {
     my ($canvas) = @_;
 
-    return (1.0 / $canvas->privateData->{"scale"});
+    return (1.0 / $canvas->privateData->{'scale'});
 }
 
 sub worldx {
     my ($canvas, $x) = @_;
 
     my $pData = $canvas->privateData;
-    my $scale = $pData->{"scale"};
+    my $scale = $pData->{'scale'};
     return if !$scale;
-    return (($canvas->canvasx($x) - $pData->{movex}) / $scale);
+    return (($canvas->canvasx($x) - $pData->{'movex'}) / $scale);
 }
 
 sub worldy {
     my ($canvas, $y) = @_;
 
     my $pData = $canvas->privateData;
-    my $scale = $pData->{"scale"};
+    my $scale = $pData->{'scale'};
     return if !$scale;
-    return (-($canvas->canvasy($y) - $pData->{movey}) / $scale);
+    return (-($canvas->canvasy($y) - $pData->{'movey'}) / $scale);
 }
 
 sub worldxy {
     my ($canvas, $x, $y) = @_;
 
     my $pData = $canvas->privateData;
-    my $scale = $pData->{"scale"};
+    my $scale = $pData->{'scale'};
     return if !$scale;
-    return ( ($canvas->canvasx($x) - $pData->{movex}) / $scale,
-            -($canvas->canvasy($y) - $pData->{movey}) / $scale);
+    return ( ($canvas->canvasx($x) - $pData->{'movex'}) / $scale,
+            -($canvas->canvasy($y) - $pData->{'movey'}) / $scale);
 }
 
 sub widgetx {
     my ($canvas, $x) = @_;
 
     my $pData = $canvas->privateData;
-    return ($x * $pData->{"scale"} + $pData->{movex} - $canvas->canvasx(0));
+    return ($x * $pData->{'scale'} + $pData->{'movex'} - $canvas->canvasx(0));
 }
 
 sub widgety {
     my ($canvas, $y) = @_;
 
     my $pData = $canvas->privateData;
-    return (-$y * $pData->{"scale"} + $pData->{movey} - $canvas->canvasy(0));
+    return (-$y * $pData->{'scale'} + $pData->{'movey'} - $canvas->canvasy(0));
 }
 
 sub widgetxy {
     my ($canvas, $x, $y) = @_;
 
     my $pData = $canvas->privateData;
-    my $scale = $pData->{"scale"};
-    return ( $x * $scale + $pData->{movex} - $canvas->canvasx(0),
-            -$y * $scale + $pData->{movey} - $canvas->canvasy(0));
+    my $scale = $pData->{'scale'};
+    return ( $x * $scale + $pData->{'movex'} - $canvas->canvasx(0),
+            -$y * $scale + $pData->{'movey'} - $canvas->canvasy(0));
 }
 
-# In older versions of Tk, createType calls create("type", ...)
+# In older versions of Tk, createType calls create('type', ...)
 # 'coords_mapped' is used to avoid calling _map_coords twice.
 # I could have had the createType methods all call create, but
 # that defeats the point of the new Tk optimization to avoid
@@ -786,9 +794,7 @@ sub widgetxy {
 my $coords_mapped = 0;
 
 sub create {
-    my $canvas = shift;
-    my $type = shift;
-
+    my ($canvas, $type) = splice(@_, 0, 2);
     my @new_args = ($coords_mapped) ? @_ : _map_coords($canvas, @_);
     return ($canvas->SUPER::create($type, @new_args));
 }
@@ -914,15 +920,15 @@ Zooms the display by the specified amount.  Example:
 
     # If you are using the 'Scrolled' constructor as in:
     my $worldcanvas = $main->Scrolled('WorldCanvas', -scrollbars => 'nw', ... )
-    # you want to bind the key-presses to the "worldcanvas" Subwidget of Scrolled.
-    my $subw = $worldcanvas->Subwidget("worldcanvas"); # note the lower case "worldcanvas"
+    # you want to bind the key-presses to the 'worldcanvas' Subwidget of Scrolled.
+    my $subw = $worldcanvas->Subwidget('worldcanvas'); # note the lower case 'worldcanvas'
     $subw->CanvasBind('<i>' => sub {$subw->zoom(1.25)});
     $subw->CanvasBind('<o>' => sub {$subw->zoom(0.8)});
 
     # I don't like the scrollbars taking the focus when I
     # <ctrl>-tab through the windows, so I:
-    $worldcanvas->Subwidget("xscrollbar")->configure(-takefocus => 0);
-    $worldcanvas->Subwidget("yscrollbar")->configure(-takefocus => 0);
+    $worldcanvas->Subwidget('xscrollbar')->configure(-takefocus => 0);
+    $worldcanvas->Subwidget('yscrollbar')->configure(-takefocus => 0);
 
 
 =item I<$worldcanvas>->B<center>(I<x, y>)
@@ -966,10 +972,10 @@ key-bindings.
 
     Example:
 
-    $mainwindow->bind("WorldCanvas",    "<Up>" => "");
-    $mainwindow->bind("WorldCanvas",  "<Down>" => "");
-    $mainwindow->bind("WorldCanvas",  "<Left>" => "");
-    $mainwindow->bind("WorldCanvas", "<Right>" => "");
+    $mainwindow->bind('WorldCanvas',    '<Up>' => "");
+    $mainwindow->bind('WorldCanvas',  '<Down>' => "");
+    $mainwindow->bind('WorldCanvas',  '<Left>' => "");
+    $mainwindow->bind('WorldCanvas', '<Right>' => "");
 
     $worldcanvas->CanvasBind(   '<Up>' => sub {$worldcanvas->panWorld(0,  100);});
     $worldcanvas->CanvasBind( '<Down>' => sub {$worldcanvas->panWorld(0, -100);});
@@ -1041,6 +1047,10 @@ in the I<WorldCanvas>.
 This method adjusts the worldcanvas to display all of
 the specified tags.  The '-border' switch specifies (as a percentage)
 how much extra surrounding space should be shown.
+
+=item I<$worldcanvas>->B<getView>()
+
+Returns the rectangle of the current view (x1, y1, x2, y2)
 
 =item I<$worldcanvas>->B<widgetx>(I<x>)
 
