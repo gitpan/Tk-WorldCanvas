@@ -5,10 +5,11 @@ use strict;
 use Tk;
 
 use vars qw($VERSION);
-$VERSION = '1.0.0';
+$VERSION = '1.1.0';
 
 #Version
 #1.0.0 -- Sept 20, 2001 -- Initial release.
+#1.1.0 -- Oct  29, 2001 -- Added '-changeView' callback option
 
 @WorldCanvas::ISA = qw(Tk::Derived Tk::Canvas);
 
@@ -35,9 +36,11 @@ sub InitObject {
     $worldcanvas->configure(-confine => 0);
 
     $worldcanvas->ConfigSpecs('-bandColor' => ["PASSIVE", "bandColor", "BandColor", "red"],
-                              '-bandcolor' => '-bandColor');
+                              '-bandcolor' => '-bandColor',
+                              '-changeView' => ["CALLBACK", "changeView", "ChangeView", undef],
+                              '-changeview'  => '-changeView');
 
-    $worldcanvas->Tk::bind('<Configure>' =>
+    $worldcanvas->CanvasBind('<Configure>' =>
         sub {
             my $w = $worldcanvas->width();
             my $h = $worldcanvas->height();
@@ -55,16 +58,29 @@ sub InitObject {
     $worldcanvas->SUPER::InitObject($args);
 }
 
+sub _changeView {
+    my ($canvas) = @_;
+
+    my $borderwidth = $canvas->cget("-borderwidth");
+    my $right_edge = $canvas->width() - $borderwidth;
+    my $top_edge = $canvas->height() - $borderwidth;
+
+    $canvas->Callback(-changeView, worldxy($canvas, $borderwidth, $borderwidth),
+                                   worldxy($canvas, $right_edge, $top_edge));
+}
+
 sub xview {
     my $canvas = shift;
     _new_bbox($canvas) if !$canvas->privateData->{bboxvalid};
     $canvas->SUPER::xview(@_);
+    _changeView($canvas) if defined($canvas->cget('-changeView'));
 }
 
 sub yview {
     my $canvas = shift;
     _new_bbox($canvas) if !$canvas->privateData->{bboxvalid};
     $canvas->SUPER::yview(@_);
+    _changeView($canvas) if defined($canvas->cget('-changeView'));
 }
 
 sub delete {
@@ -167,6 +183,7 @@ sub zoom {
     my ($canvas, $zoom) = @_;
     _new_bbox($canvas) if !$canvas->privateData->{bboxvalid};
     _scale($canvas, $canvas->width() / 2, $canvas->height() / 2, $zoom);
+    _changeView($canvas) if defined($canvas->cget('-changeView'));
 }
 
 sub _scale {
@@ -194,8 +211,6 @@ sub _scale {
     $y2 = ($y2 - $y) * $scale + $y;
     $pData->{bbox} =                    [$x1, $y1, $x2, $y2];
     $canvas->configure(-scrollregion => [$x1, $y1, $x2, $y2]);
-
-    return;
 }
 
 sub center {
@@ -225,6 +240,7 @@ sub center {
     $y2 += $dy;
     $pData->{bbox} =                    [$x1, $y1, $x2, $y2];
     $canvas->configure(-scrollregion => [$x1, $y1, $x2, $y2]);
+    _changeView($canvas) if defined($canvas->cget('-changeView'));
 }
 
 sub centerTags {
@@ -348,6 +364,7 @@ sub _view_area_canvas {
     $y2 = ($y2 + $dy - $midy) * $zoom + $midy;
     $pData->{bbox} =                    [$x1, $y1, $x2, $y2];
     $canvas->configure(-scrollregion => [$x1, $y1, $x2, $y2]);
+    _changeView($canvas) if defined($canvas->cget('-changeView'));
 }
 
 sub _map_coords {
@@ -863,7 +880,7 @@ __END__
 
 =head1 NAME
 
-WorldCanvas - Perl/Tk Canvas widget which uses the user's coordinate system.
+I<WorldCanvas> - Autoscaling Canvas widget with zoom, viewAll, viewArea, viewFit, and center.
 
 =for category Tk Widget Classes
 
@@ -892,15 +909,15 @@ of widget coordinates.
 
 Zooms the display by the specified amount.  Example:
 
-    $worldcanvas->Tk::bind('<i>' => sub {$worldcanvas->zoom(1.25)});
-    $worldcanvas->Tk::bind('<o>' => sub {$worldcanvas->zoom(0.8)});
+    $worldcanvas->CanvasBind('<i>' => sub {$worldcanvas->zoom(1.25)});
+    $worldcanvas->CanvasBind('<o>' => sub {$worldcanvas->zoom(0.8)});
 
     # If you are using the 'Scrolled' constructor as in:
     my $worldcanvas = $main->Scrolled('WorldCanvas', -scrollbars => 'nw', ... )
     # you want to bind the key-presses to the "worldcanvas" Subwidget of Scrolled.
     my $subw = $worldcanvas->Subwidget("worldcanvas"); # note the lower case "worldcanvas"
-    $subw->Tk::bind('<i>' => sub {$subw->zoom(1.25)});
-    $subw->Tk::bind('<o>' => sub {$subw->zoom(0.8)});
+    $subw->CanvasBind('<i>' => sub {$subw->zoom(1.25)});
+    $subw->CanvasBind('<o>' => sub {$subw->zoom(0.8)});
 
     # I don't like the scrollbars taking the focus when I
     # <ctrl>-tab through the windows, so I:
@@ -913,9 +930,12 @@ Zooms the display by the specified amount.  Example:
 Centers the display around world coordinates x, y.
 Example:
 
-    $worldcanvas->Tk::bind('<2>' => sub {$worldcanvas->Tk::focus();
-                                         $worldcanvas->center($worldcanvas->eventLocation());
-                                        });
+    $worldcanvas->CanvasBind('<2>' =>
+        sub {
+            $worldcanvas->CanvasFocus;
+            $worldcanvas->center($worldcanvas->eventLocation);
+        }
+    );
 
 
 =item I<$worldcanvas>->B<centerTags>([-exact => {0 | 1}], I<TagOrID, [TagOrID, ...]>)
@@ -928,6 +948,9 @@ magnification of the display.
 an accurate bounding box.  This will be expensive if the canvas
 contains a large number of objects.
 
+=item I<$worldcanvas>->B<eventLocation>()
+
+This function returns the world coordinates (x, y) of the last Xevent.
 
 =item I<$worldcanvas>->B<panWorld>(I<dx, dy>)
 
@@ -948,46 +971,19 @@ key-bindings.
     $mainwindow->bind("WorldCanvas",  "<Left>" => "");
     $mainwindow->bind("WorldCanvas", "<Right>" => "");
 
-    $worldcanvas->Tk::bind(   '<Up>' => sub {$worldcanvas->panWorld(0,  100);});
-    $worldcanvas->Tk::bind( '<Down>' => sub {$worldcanvas->panWorld(0, -100);});
-    $worldcanvas->Tk::bind( '<Left>' => sub {$worldcanvas->panWorld(-100, 0);});
-    $worldcanvas->Tk::bind('<Right>' => sub {$worldcanvas->panWorld( 100, 0);});
+    $worldcanvas->CanvasBind(   '<Up>' => sub {$worldcanvas->panWorld(0,  100);});
+    $worldcanvas->CanvasBind( '<Down>' => sub {$worldcanvas->panWorld(0, -100);});
+    $worldcanvas->CanvasBind( '<Left>' => sub {$worldcanvas->panWorld(-100, 0);});
+    $worldcanvas->CanvasBind('<Right>' => sub {$worldcanvas->panWorld( 100, 0);});
 
 This is not usually desired, as the percentage of the display that
 is shifted will be dependent on the current display magnification.
 
 
-=item I<$worldcanvas>->B<viewAll>([-border => number])
+=item I<$worldcanvas>->B<pixelSize>()
 
-Displays at maximum possible zoom all objects centered in the
-I<WorldCanvas>.  The switch '-border' specifies, as a percentage
-of the screen, the minimum amount of white space to be left on
-the edges of the display.  Default '-border' is 0.02.
-
-=item I<$worldcanvas>->B<viewArea>(x1, y1, x2, y2, [-border => number]))
-
-Displays at maximum possible zoom the specified region centered
-in the I<WorldCanvas>.
-
-=item I<$worldcanvas>->B<worldx>(I<x>)
-
-=item I<$worldcanvas>->B<worldy>(I<y>)
-
-=item I<$worldcanvas>->B<worldxy>(I<x, y>)
-
-Convert widget coordinates to world coordinates.
-
-=item I<$worldcanvas>->B<widgetx>(I<x>)
-
-=item I<$worldcanvas>->B<widgety>(I<y>)
-
-=item I<$worldcanvas>->B<widgetxy>(I<x, y>)
-
-Convert world coordinates to widget coordinates.
-
-=item I<$worldcanvas>->B<eventLocation>()
-
-This function returns the world coordinates (x, y) of the last Xevent.
+This function returns the width (in world coordinates) of a
+pixel (at the current magnification).
 
 =item I<$worldcanvas>->B<rubberBand>(I<{0|1|2}>)
 
@@ -1003,41 +999,64 @@ The default color is 'red'
 Example, specify a region to delete:
 
     $worldcanvas->configure(-bandColor => 'purple');
-    $worldcanvas->Tk::bind('<3>'               => sub {$worldcanvas->Tk::focus();
-                                                       $worldcanvas->rubberBand(0)
-                                                      });
-    $worldcanvas->Tk::bind('<B3-Motion>'       => sub {$worldcanvas->rubberBand(1)});
-    $worldcanvas->Tk::bind('<ButtonRelease-3>' => sub {my @box = $worldcanvas->rubberBand(2);
-                                                       my @ids = $worldcanvas->find('enclosed', @box);
-                                                       foreach my $id (@ids) {$worldcanvas->delete($id)}
-                                                      });
+    $worldcanvas->CanvasBind('<3>'               => sub {$worldcanvas->CanvasFocus;
+                                                         $worldcanvas->rubberBand(0)
+                                                        });
+    $worldcanvas->CanvasBind('<B3-Motion>'       => sub {$worldcanvas->rubberBand(1)});
+    $worldcanvas->CanvasBind('<ButtonRelease-3>' => sub {my @box = $worldcanvas->rubberBand(2);
+                                                         my @ids = $worldcanvas->find('enclosed', @box);
+                                                         foreach my $id (@ids) {$worldcanvas->delete($id)}
+                                                        });
     # Note: '<B3-ButtonRelease>' will be called for any ButtonRelease!
     # You should use '<ButtonRelease-3>' instead.
 
     # If you want the rubber band to look smooth during panning and
     # zooming, add rubberBand(1) update calls to the appropriate key-bindings:
 
-    $worldcanvas->Tk::bind(   '<Up>' => sub {$worldcanvas->rubberBand(1);});
-    $worldcanvas->Tk::bind( '<Down>' => sub {$worldcanvas->rubberBand(1);});
-    $worldcanvas->Tk::bind( '<Left>' => sub {$worldcanvas->rubberBand(1);});
-    $worldcanvas->Tk::bind('<Right>' => sub {$worldcanvas->rubberBand(1);});
-    $worldcanvas->Tk::bind('<i>' => sub {$worldcanvas->zoom(1.25); $worldcanvas->rubberBand(1);});
-    $worldcanvas->Tk::bind('<o>' => sub {$worldcanvas->zoom(0.8);  $worldcanvas->rubberBand(1);});
+    $worldcanvas->CanvasBind(   '<Up>' => sub {$worldcanvas->rubberBand(1);});
+    $worldcanvas->CanvasBind( '<Down>' => sub {$worldcanvas->rubberBand(1);});
+    $worldcanvas->CanvasBind( '<Left>' => sub {$worldcanvas->rubberBand(1);});
+    $worldcanvas->CanvasBind('<Right>' => sub {$worldcanvas->rubberBand(1);});
+    $worldcanvas->CanvasBind('<i>' => sub {$worldcanvas->zoom(1.25); $worldcanvas->rubberBand(1);});
+    $worldcanvas->CanvasBind('<o>' => sub {$worldcanvas->zoom(0.8);  $worldcanvas->rubberBand(1);});
 
 This box avoids the overhead of bounding box calculations
 that can occur if you create your own rubberBand outside of I<WorldCanvas>.
 
 
+=item I<$worldcanvas>->B<viewAll>([-border => number])
+
+Displays at maximum possible zoom all objects centered in the
+I<WorldCanvas>.  The switch '-border' specifies, as a percentage
+of the screen, the minimum amount of white space to be left on
+the edges of the display.  Default '-border' is 0.02.
+
+=item I<$worldcanvas>->B<viewArea>(x1, y1, x2, y2, [-border => number]))
+
+Displays at maximum possible zoom the specified region centered
+in the I<WorldCanvas>.
+
 =item I<$worldcanvas>->B<viewFit>([-border => number], I<TagOrID>, [I<TagOrID>, ...])
 
-This subroutine adjusts the worldcanvas to display all of
+This method adjusts the worldcanvas to display all of
 the specified tags.  The '-border' switch specifies (as a percentage)
 how much extra surrounding space should be shown.
 
-=item I<$worldcanvas>->B<pixelSize>()
+=item I<$worldcanvas>->B<widgetx>(I<x>)
 
-This function returns the width (in world coordinates) of a
-pixel (at the current magnification).
+=item I<$worldcanvas>->B<widgety>(I<y>)
+
+=item I<$worldcanvas>->B<widgetxy>(I<x, y>)
+
+Convert world coordinates to widget coordinates.
+
+=item I<$worldcanvas>->B<worldx>(I<x>)
+
+=item I<$worldcanvas>->B<worldy>(I<y>)
+
+=item I<$worldcanvas>->B<worldxy>(I<x, y>)
+
+Convert widget coordinates to world coordinates.
 
 =back
 
@@ -1077,6 +1096,34 @@ B<viewArea>, and B<viewAll> should be used to change the
 scale of the display without affecting the dimensions of the objects.
 
 =back
+
+=head1 VIEW AREA CHANGE CALLBACK
+
+I<Tk::WorldCanvas> option '-changeView' can be used to specify
+a callback for a change of the view area.  This is useful for
+updating a second worldcanvas which is displaying the view region
+of the first worldcanvas.
+
+The callback subroutine will be passed the coordinates of the
+displayed box (x1, y1, x2, y2).  These arguments are added after
+any extra arguments specifed by the user calling 'configure'.
+
+    Example:
+
+    $worldcanvas->configure(-changeView => [\&changeView, $worldcanvas2]);
+    # viewAll if worldcanvas2 widget is resized.
+    $worldcanvas2->CanvasBind('<Configure>' => sub {$worldcanvas2->viewAll});
+
+    {
+        my $viewBox;
+        sub changeView {
+            my ($canvas2, @coords) = @_;
+
+            $canvas2->delete($viewBox) if $viewBox;
+            $viewBox = $canvas2->createRectangle(@coords, -outline => 'orange');
+        }
+    }
+
 
 =head1 SCROLL REGION NOTES
 
@@ -1122,7 +1169,7 @@ If you use and enjoy I<WorldCanvas> please let me know.
 
 This module is distributed under the same terms as Perl itself.
 
-This module may distributed under the terms of the
+This module may be distributed under the terms of the
 GNU General Public License (GPL) or under the terms of
 the Artistic License.
 
