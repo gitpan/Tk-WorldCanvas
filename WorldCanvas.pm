@@ -5,7 +5,7 @@ use strict;
 use Tk;
 
 use vars qw($VERSION);
-$VERSION = '1.2.5';
+$VERSION = '1.2.6';
 
 #Version
 #1.0.0 -- Sept 20, 2001 -- Initial release.
@@ -18,6 +18,7 @@ $VERSION = '1.2.5';
 #1.2.3 -- July 31, 2002 -- Fixed another bug in 'coords', and an agrument passing bug.
 #1.2.4 -- Sept  5, 2002 -- Added to POD
 #1.2.5 -- Sept  6, 2002 -- Enhanced view window scaleing on canvas resize
+#1.2.6 -- Nov   1, 2002 -- Fixed _view_area_canvas bug.
 
 @Tk::WorldCanvas::ISA = qw(Tk::Derived Tk::Canvas);
 
@@ -80,9 +81,11 @@ sub getView {
 
     my $borderwidth = $canvas->cget('-borderwidth');
     my $right_edge = $canvas->width - $borderwidth;
-    my $top_edge = $canvas->height - $borderwidth;
+    my $left_edge = $borderwidth;
+    my $bot_edge = $canvas->height - $borderwidth;
+    my $top_edge = $borderwidth;
 
-    return (worldxy($canvas, $borderwidth, $borderwidth), worldxy($canvas, $right_edge, $top_edge));
+    return (worldxy($canvas, $left_edge, $bot_edge), worldxy($canvas, $right_edge, $top_edge));
 }
 
 sub xview {
@@ -235,8 +238,8 @@ sub center {
     $x = $x *  $pData->{'scale'} + $pData->{'movex'};
     $y = $y * -$pData->{'scale'} + $pData->{'movey'};
 
-    my $dx = $canvas->canvasx($canvas->width / 2) - $x;
-    my $dy = $canvas->canvasy($canvas->height / 2) - $y;
+    my $dx = $canvas->canvasx(0) + $canvas->width / 2 - $x;
+    my $dy = $canvas->canvasy(0) + $canvas->height / 2 - $y;
 
     $pData->{'movex'} += $dx;
     $pData->{'movey'} += $dy;
@@ -342,8 +345,8 @@ sub _view_area_canvas {
     my $dx = $cwidth / 2 - ($vx1 + $vx2) / 2;
     my $dy = $cheight / 2 - ($vy1 + $vy2) / 2;
 
-    my $midx = $canvas->canvasx($cwidth / 2);
-    my $midy = $canvas->canvasy($cheight / 2);
+    my $midx = $canvas->canvasx(0) + $cwidth / 2;
+    my $midy = $canvas->canvasy(0) + $cheight / 2;
 
     $vx2 += 1 if $vx2 == $vx1;
     $vy2 += 1 if $vy2 == $vy1;
@@ -1075,23 +1078,6 @@ Displays at maximum possible zoom all objects centered in the
 I<WorldCanvas>.  The switch '-border' specifies, as a percentage
 of the screen, the minimum amount of white space to be left on
 the edges of the display.  Default '-border' is 0.02.
-
-All I<WorldCanvas> view methods use the current canvas height and width to
-determine the scale and position of the view area.  The canvas size will
-be '1 by 1' until it is instantiated by the MainLoop call or the first 
-$MainWindow->update().  So the view methods will produce undesirable results
-if they are called before the canvas has been instantiated (and given a size).
-
-It is common for an application to start by adding objects, calling B<viewAll> or
-B<viewArea>, and then entering MainLoop.  A $MainWindow->update is needed before
-the B<viewAll>. 
-
-    Example:
-
-    <Add objects to canvas>
-    $mw->update;         # Instantiates the canvas (and determines its width and height)
-    $worldcanvas->viewAll;
-    MainLoop;
 
 
 =item I<$worldcanvas>->B<viewArea>(x1, y1, x2, y2, [-border => number]))
